@@ -68,7 +68,8 @@ code {
   font-size: calc(var(--doc-font) * 0.95);
 }
 
-.tag { background: #E6F1FB; color: #185FA5; padding: 0 1.2mm; border-radius: 3px; font-size: calc(var(--doc-font) * 0.92); }
+/* 灰度打印安全：标签带描边，黑白打印机下退化为醒目边框而非消失 */
+.tag { background: #E6F1FB; color: #185FA5; padding: 0 1.2mm; border: 0.5pt solid #9CC3E8; border-radius: 3px; font-size: calc(var(--doc-font) * 0.92); }
 
 blockquote {
   margin: calc(var(--gap-p) * 1.2) 0;
