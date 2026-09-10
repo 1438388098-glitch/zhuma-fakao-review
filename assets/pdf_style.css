@@ -1,0 +1,122 @@
+/* 法考错题笔记 PDF 排版样式
+ * 三档密度由 :root 变量控制，由 scripts/lib/env.js 的 layoutCssVars() 注入：
+ *   --doc-font  正文字号      --doc-lh    正文行高
+ *   --tbl-font  表格字号      --tbl-pad   单元格内边距
+ *   --margin-v  上下页边距    --margin-h  左右页边距
+ *   --gap-h     标题上下间距  --gap-p     段落间距
+ * 默认值（compact）：9.3pt / 1.45 / 8.8pt / 0.8mm / 11mm / 10mm / 4mm / 1.2mm
+ */
+
+@page { size: A4; margin: var(--margin-v) var(--margin-h); }
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: "Microsoft YaHei", "PingFang SC", "Source Han Sans SC", "Noto Sans CJK SC", sans-serif;
+  font-size: var(--doc-font);
+  line-height: var(--doc-lh);
+  color: #1a1a1a;
+  margin: 0;
+}
+
+h1 {
+  font-size: calc(var(--doc-font) * 1.6);
+  margin: 0 0 calc(var(--gap-h) * 0.75);
+  padding-bottom: 1.5mm;
+  border-bottom: 1.5pt solid #185FA5;
+  color: #0C447C;
+}
+
+h2 {
+  font-size: calc(var(--doc-font) * 1.24);
+  margin: var(--gap-h) 0 calc(var(--gap-h) * 0.4);
+  padding-left: 2mm;
+  border-left: 3px solid #378ADD;
+  color: #0C447C;
+  page-break-after: avoid;
+}
+
+h3 {
+  font-size: calc(var(--doc-font) * 1.1);
+  margin: calc(var(--gap-h) * 0.7) 0 calc(var(--gap-h) * 0.25);
+  color: #185FA5;
+  page-break-after: avoid;
+}
+
+h4 {
+  font-size: calc(var(--doc-font) * 1.05);
+  margin: calc(var(--gap-h) * 0.5) 0 calc(var(--gap-h) * 0.25);
+  color: #333;
+  page-break-after: avoid;
+}
+
+h5, h6 { font-size: var(--doc-font); margin: calc(var(--gap-h) * 0.45) 0 calc(var(--gap-h) * 0.25); color: #444; page-break-after: avoid; }
+
+p { margin: 0 0 var(--gap-p); }
+ul, ol { margin: 0 0 calc(var(--gap-p) * 1.2); padding-left: 5mm; }
+li { margin-bottom: calc(var(--gap-p) * 0.35); }
+
+strong { color: #A32D2D; }
+
+code {
+  background: #F1EFE8;
+  padding: 0 0.8mm;
+  border-radius: 2px;
+  font-family: Consolas, monospace;
+  font-size: calc(var(--doc-font) * 0.95);
+}
+
+.tag { background: #E6F1FB; color: #185FA5; padding: 0 1.2mm; border-radius: 3px; font-size: calc(var(--doc-font) * 0.92); }
+
+blockquote {
+  margin: calc(var(--gap-p) * 1.2) 0;
+  padding: calc(var(--gap-p) * 1.2) 2mm;
+  background: #F7F9FC;
+  border-left: 3px solid #85B7EB;
+  color: #444;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: calc(var(--gap-p) * 1.2) 0 calc(var(--gap-p) * 2);
+  font-size: var(--tbl-font);
+  page-break-inside: avoid;
+}
+
+th, td {
+  border: 0.5pt solid #bbb;
+  padding: var(--tbl-pad) 1.5mm;
+  text-align: left;
+  vertical-align: top;
+  line-height: calc(var(--doc-lh) * 0.92);
+}
+
+th { background: #EEF4FB; color: #0C447C; font-weight: 600; }
+
+hr { border: none; border-top: 0.5pt solid #ccc; margin: calc(var(--gap-h) * 0.8) 0; }
+
+/* 封面 */
+.cover { text-align: center; padding-top: 58mm; page-break-after: always; }
+.cover h1 { border: none; font-size: calc(var(--doc-font) * 2.2); margin: 0 0 6mm; }
+.cover .sub { font-size: calc(var(--doc-font) * 1.25); color: #185FA5; margin-bottom: 3mm; }
+.cover .line { width: 40mm; height: 2pt; background: #378ADD; margin: 5mm auto; }
+.cover .meta { font-size: calc(var(--doc-font) * 1.05); color: #777; margin-top: 3mm; line-height: 1.8; }
+
+/* 目录（仅总册用） */
+.toc { page-break-after: always; }
+.toc table { font-size: calc(var(--tbl-font) * 1.08); }
+.toc td.num { text-align: right; width: 22mm; }
+.toc td.vol { color: #666; width: 26mm; }
+.toc .hint { margin-top: 5mm; font-size: calc(var(--doc-font) * 0.96); color: #888; }
+
+/* 总册分节 */
+section.subj { page-break-before: always; }
+section.subj.first { page-break-before: auto; }
+.subjmeta {
+  font-size: calc(var(--doc-font) * 0.96);
+  color: #666;
+  margin: -1mm 0 3mm;
+  padding-bottom: 1.5mm;
+  border-bottom: 0.5pt solid #ddd;
+}
