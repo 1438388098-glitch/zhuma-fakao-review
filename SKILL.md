@@ -51,6 +51,8 @@ agent_created: true
 ├── qr_login.png                # 登录二维码（扫码成功后可删）
 ├── scrape/
 │   ├── profile/                # 浏览器持久 profile（登录态 cookie，敏感，勿入云同步/分享）
+│   ├── profile-pdf/            # 渲染专用浏览器 profile（04 用，与登录无关，可随时删）
+│   ├── .scrape.lock / .render.lock  # 运行锁文件（异常残留超过 2 小时可手动删）
 │   ├── login_ok.flag           # 登录成功标记（01 写，编排方读）
 │   ├── catalogs.json           # 科目→章节 目录树 + 每章题数
 │   ├── chapter_sets.json       # 各章题目 id 清单（断点续跑用）
@@ -259,7 +261,7 @@ agent_created: true
 | 8 | `scripts/04_render_pdf.js` | 渲染单科 PDF；`--volume` 生成总册 | `--work <目录>` `--volume` `--desktop` |
 | — | `scripts/lib/env.js` | 环境探测与公共工具（被上述脚本引用，不单独运行） | — |
 
-**退出码约定**（01/02/03/04/05 一致遵守）：0 成功；1 完成但存在失败/缺失（通常重跑即可续抓）；2 缺输入或未登录（按报错提示先补前置步骤）。
+**退出码约定**：0 成功；1 完成但存在失败/缺失（通常重跑即可续抓）；2 前置条件不满足。各脚本精确口径以其文件头注释为准（如 02 的 2=未登录、01 的 2=找不到二维码、03/05 的 2=缺输入或参数错误）。
 
 排版由 `scripts/04_render_pdf.js` 从 `<工作目录>/study_profile.json` 的 `layout` 读取；学情字段由阶段 4/5 的 subagent 提示词注入；字段缺失时用 `env.js` 的 `DEFAULT_PROFILE` 兜底，不会中断。
 

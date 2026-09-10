@@ -67,13 +67,13 @@ function parseArgs(argv) {
 }
 
 /**
- * 读取数值型命令行参数。--key 忘给值（args[key] === true）或非法值时按 def 兜底；
- * 给了值但不是合法数字 / 超出范围时直接抛错 —— 避免 Number(true)=1、NaN 按 0ms 处理之类的静默陷阱。
+ * 读取数值型命令行参数。--key 忘给值（args[key] === true）时按 def 兜底；
+ * 给了值但不是合法数字 / 超出范围时直接抛错 —— 避免 Number(true)=1、Number('')=0 之类的静默陷阱。
  */
 function numArg(args, key, def, opt = {}) {
   const { min = -Infinity, max = Infinity, int = false } = opt;
   let v = args ? args[key] : undefined;
-  if (v === undefined || v === true || v === '') v = def;
+  if (v === undefined || v === true) v = def;
   const n = Number(v);
   if (!Number.isFinite(n)) throw new Error(`参数 --${key} 不是有效数字：${JSON.stringify(v)}`);
   if (int && !Number.isInteger(n)) throw new Error(`参数 --${key} 必须是整数：${v}`);
@@ -126,15 +126,29 @@ function writeJsonAtomic(file, data, pretty) {
   writeFileAtomic(file, JSON.stringify(data, null, pretty === undefined ? 0 : pretty));
 }
 
-/** 进程级互斥锁（防止同目录跑两个实例互相覆盖）。返回是否拿到锁；锁超过 2 小时视为过期可抢占。 */
+/**
+ * 进程级互斥锁（防止同目录跑两个实例互相覆盖）。返回是否拿到锁；锁超过 2 小时视为过期可抢占。
+ * 用 wx 标志原子创建，避免两个进程同时检测"锁不存在"后双双拿锁（TOCTOU）。
+ */
 function acquireLock(file) {
-  try {
-    const st = fs.statSync(file);
-    if (Date.now() - st.mtimeMs < 2 * 60 * 60 * 1000) return false;
-    console.error('WARN: 发现超过 2 小时的过期锁文件，视为残留并覆盖。');
-  } catch (e) { /* 不存在，正常 */ }
-  fs.writeFileSync(file, String(process.pid), 'utf8');
-  return true;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      fs.writeFileSync(file, String(process.pid), { flag: 'wx' });
+      return true;
+    } catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+    }
+    try {
+      const st = fs.statSync(file);
+      if (Date.now() - st.mtimeMs < 2 * 60 * 60 * 1000) return false;
+      console.error('WARN: 发现超过 2 小时的过期锁文件，视为残留并抢占。');
+      fs.unlinkSync(file);
+    } catch (e2) {
+      if (e2.code === 'ENOENT') continue; // 锁刚被别的进程释放，回头重试创建
+      return false;
+    }
+  }
+  return false;
 }
 
 function releaseLock(file) { try { fs.unlinkSync(file); } catch (e) { /* ignore */ } }

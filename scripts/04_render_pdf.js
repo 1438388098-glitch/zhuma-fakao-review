@@ -32,6 +32,10 @@ const profile = env.readProfile(WORK);
 const LOCK = path.join(SC, '.render.lock');
 
 // 总册开关：命令行显式参数 > study_profile.json 的 output_granularity > 默认生成
+if (args.volume && args['no-volume']) {
+  console.error('--volume 与 --no-volume 互相矛盾，只能传一个');
+  process.exit(2);
+}
 const wantVolume = args.volume ? true
   : args['no-volume'] ? false
     : (profile.output_granularity !== 'per_subject');
@@ -176,13 +180,15 @@ const PAGE_OPTS = {
     return 1;
   }
 
-  const CSS = loadCss();
-  const CHROME = env.findChrome();
-  const ctx = await chromium.launchPersistentContext(path.join(SC, 'profile-pdf'), {
-    executablePath: CHROME, headless: true,
-    args: ['--no-first-run', '--no-default-browser-check'],
-  });
+  // ctx 从创建到 close 全程在 try 内：loadCss/findChrome/启动失败也不能泄漏锁
+  let ctx = null;
   try {
+    const CSS = loadCss();
+    const CHROME = env.findChrome();
+    ctx = await chromium.launchPersistentContext(path.join(SC, 'profile-pdf'), {
+      executablePath: CHROME, headless: true,
+      args: ['--no-first-run', '--no-default-browser-check'],
+    });
     const page = ctx.pages()[0] || await ctx.newPage();
     const bySubject = {};
     for (const m of manifest) (bySubject[m.subjectKey] = bySubject[m.subjectKey] || []).push(m);
@@ -218,9 +224,12 @@ const PAGE_OPTS = {
     const results = [];
     const failed = [];
     let missingParts = 0;
+    const cpByKey = {}; // 缓存各科 collectParts 结果，总册复用，避免二次读文件与 missing 双计
     for (const [key, parts] of Object.entries(bySubject)) {
       try {
-        const { bodies, missing, found, foundCount } = collectParts(parts);
+        const cp = collectParts(parts);
+        cpByKey[key] = cp;
+        const { bodies, missing, found, foundCount } = cp;
         if (missing.length) {
           missingParts += missing.length;
           for (const p of missing) console.error('WARN 缺笔记:', p.noteFile, `（manifest 题数 ${p.count}，重跑阶段 4 对应 subagent 可补齐）`);
@@ -249,59 +258,68 @@ const PAGE_OPTS = {
       }
     }
 
-    // 复制到交付目录（固定目录名，避免科目数变化时残留多个旧目录）
+    // 复制到交付目录（固定目录名），并清理本次未产出的过期 PDF
     const deliver = env.ensureDir(path.join(WORK, '法考错题笔记'));
     for (const r of results) fs.copyFileSync(r.file, path.join(deliver, path.basename(r.file)));
+    const keep = new Set(results.map(r => path.basename(r.file)));
+    for (const f of fs.readdirSync(deliver)) {
+      if (f.endsWith('.pdf') && !keep.has(f)) {
+        try { fs.unlinkSync(path.join(deliver, f)); console.log('已清理过期交付文件:', f); } catch (e) { console.error('WARN 清理失败:', f, (e && e.message) || e); }
+      }
+    }
     env.writeJsonAtomic(path.join(SC, 'pdf_manifest.json'), results, 2);
     console.log('单科 PDF 完成：', results.length, '→', deliver);
 
     // ---------- 总册 ----------
     if (wantVolume) {
-      const rank = g => (g === '客观题一' ? 0 : 1);
-      const allSubs = Object.entries(bySubject).map(([key, parts]) => {
-        const cp = collectParts(parts);
-        if (cp.missing.length) {
-          missingParts += cp.missing.length;
-          for (const p of cp.missing) console.error('WARN 缺笔记(总册):', p.noteFile);
+      try {
+        const rank = g => (g === '客观题一' ? 0 : 1);
+        // 复用单科阶段已收集的笔记内容，不再重复读文件与累计缺失
+        const allSubs = Object.entries(bySubject).map(([key, parts]) => {
+          const cp = cpByKey[key] || collectParts(parts);
+          return { key, cp, subject: parts[0].subject, group: parts[0].group, count: cp.foundCount };
+        });
+        // 总册与单科口径一致：没有笔记的科目不进目录/封面/正文
+        const subjects = allSubs.filter(s => s.cp.found > 0)
+          .sort((a, b) => rank(a.group) - rank(b.group) || b.count - a.count);
+        for (const s of allSubs.filter(s => s.cp.found === 0)) console.log('总册跳过（无笔记）:', s.subject);
+
+        const totalQ = subjects.reduce((a, b) => a + b.count, 0);
+        let html = `<div class="cover"><h1>法考错题知识点笔记</h1><div class="line"></div>`
+          + `<div class="sub">客观题一 + 客观题二 · 全 ${subjects.length} 科</div>`
+          + `<div class="meta">共 ${totalQ} 道错题<br>生成日期 ${localDate()}</div></div>`;
+
+        html += `<div class="toc"><h1>目录</h1><table><thead><tr><th>科目</th><th>所属卷</th>`
+          + `<th style="text-align:right">错题数</th></tr></thead><tbody>`
+          + subjects.map(s => `<tr><td>${esc(s.subject)}</td><td class="vol">${esc(s.group)}</td>`
+            + `<td class="num">${s.count} 道</td></tr>`).join('')
+          + `</tbody></table><div class="hint">提示：PDF 左侧书签面板可按科目与知识点跳转。</div></div>`;
+
+        subjects.forEach((s, idx) => {
+          html += `<section class="subj${idx === 0 ? ' first' : ''}"><h1>${esc(s.subject)}</h1>`
+            + `<div class="subjmeta">${esc(s.group)} · 共 ${s.count} 道错题 · 分 ${s.cp.found} 部分</div>`
+            + md2html(s.cp.bodies.join('\n\n')) + `</section>`;
+        });
+
+        const vol = path.join(SC, '法考错题知识点笔记_总册.pdf');
+        await renderToPdf(html, vol);
+        const kb = Math.round(fs.statSync(vol).size / 1024);
+        console.log('总册：', vol, kb + 'KB', '科目=' + subjects.length, '题=' + totalQ);
+
+        if (args.desktop) {
+          const d = env.desktopDir();
+          if (d) {
+            const dest = path.join(d, '法考错题知识点笔记_总册.pdf');
+            if (fs.existsSync(dest)) console.log('注意：桌面已存在同名文件，已覆盖 ——', dest);
+            fs.copyFileSync(vol, dest);
+            console.log('已另存到桌面：', dest);
+            console.log('提示：若桌面在 OneDrive 同步范围内，该 PDF 将同步到微软云。');
+          } else console.log('未定位到桌面目录，跳过另存');
         }
-        return { key, cp, subject: parts[0].subject, group: parts[0].group, count: cp.foundCount };
-      });
-      // 总册与单科口径一致：没有笔记的科目不进目录/封面/正文
-      const subjects = allSubs.filter(s => s.cp.found > 0)
-        .sort((a, b) => rank(a.group) - rank(b.group) || b.count - a.count);
-      for (const s of allSubs.filter(s => s.cp.found === 0)) console.log('总册跳过（无笔记）:', s.subject);
-
-      const totalQ = subjects.reduce((a, b) => a + b.count, 0);
-      let html = `<div class="cover"><h1>法考错题知识点笔记</h1><div class="line"></div>`
-        + `<div class="sub">客观题一 + 客观题二 · 全 ${subjects.length} 科</div>`
-        + `<div class="meta">共 ${totalQ} 道错题<br>生成日期 ${localDate()}</div></div>`;
-
-      html += `<div class="toc"><h1>目录</h1><table><thead><tr><th>科目</th><th>所属卷</th>`
-        + `<th style="text-align:right">错题数</th></tr></thead><tbody>`
-        + subjects.map(s => `<tr><td>${esc(s.subject)}</td><td class="vol">${esc(s.group)}</td>`
-          + `<td class="num">${s.count} 道</td></tr>`).join('')
-        + `</tbody></table><div class="hint">提示：PDF 左侧书签面板可按科目与知识点跳转。</div></div>`;
-
-      subjects.forEach((s, idx) => {
-        html += `<section class="subj${idx === 0 ? ' first' : ''}"><h1>${esc(s.subject)}</h1>`
-          + `<div class="subjmeta">${esc(s.group)} · 共 ${s.count} 道错题 · 分 ${s.cp.found} 部分</div>`
-          + md2html(s.cp.bodies.join('\n\n')) + `</section>`;
-      });
-
-      const vol = path.join(SC, '法考错题知识点笔记_总册.pdf');
-      await renderToPdf(html, vol);
-      const kb = Math.round(fs.statSync(vol).size / 1024);
-      console.log('总册：', vol, kb + 'KB', '科目=' + subjects.length, '题=' + totalQ);
-
-      if (args.desktop) {
-        const d = env.desktopDir();
-        if (d) {
-          const dest = path.join(d, '法考错题知识点笔记_总册.pdf');
-          if (fs.existsSync(dest)) console.log('注意：桌面已存在同名文件，已覆盖 ——', dest);
-          fs.copyFileSync(vol, dest);
-          console.log('已另存到桌面：', dest);
-          console.log('提示：若桌面在 OneDrive 同步范围内，该 PDF 将同步到微软云。');
-        } else console.log('未定位到桌面目录，跳过另存');
+      } catch (e) {
+        // 总册失败不吞掉单科成果，计入 failed 汇总退出码
+        failed.push('总册');
+        console.error('ERROR 总册渲染失败:', (e && e.message) || e);
       }
     }
 
@@ -314,7 +332,7 @@ const PAGE_OPTS = {
     return 0;
   } finally {
     // 任何路径都关闭浏览器，避免孤儿 Chrome 占住 profile-pdf 的单例锁
-    await ctx.close().catch(() => {});
+    if (ctx) await ctx.close().catch(() => {});
     env.releaseLock(LOCK);
   }
 })()

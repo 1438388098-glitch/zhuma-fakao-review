@@ -32,8 +32,6 @@ const log = env.log;
 const sleep = env.sleep;
 const poll = env.poll;
 
-const isQrPage = page => page.url().includes('qrlogin');
-
 const findQrDataUrl = page => page.evaluate(() => {
   const im = [...document.images].filter(x => x.src.startsWith('data:image') && x.naturalWidth > 150)[0];
   return im ? im.src : null;
@@ -80,6 +78,8 @@ function decodeQr(dataUrl) {
 
 function saveQr(qr) {
   const p = path.join(WORK, 'qr_login.' + qr.ext);
+  // 清掉另一种扩展名的旧二维码，避免主 Agent 取到过期图片
+  try { fs.unlinkSync(path.join(WORK, 'qr_login.' + (qr.ext === 'png' ? 'jpg' : 'png'))); } catch (e) { /* 不存在则忽略 */ }
   fs.writeFileSync(p, qr.buf);
   return p;
 }
@@ -99,12 +99,19 @@ function saveQr(qr) {
     const page = ctx.pages()[0] || await ctx.newPage();
 
     // 已登录检测：打开错题本页，未登录会被重定向到 qrlogin。
-    // 用轮询等重定向完成（最多 15s），而不是固定 sleep —— 慢网络下固定 6s 会误判。
+    // 用 waitForURL 给 8s 窗口等重定向（服务端 302 或客户端 JS 延迟跳转都能等到），
+    // 首次没跳再复核一次，两次都没跳才判定已登录 —— 避免 domcontentloaded 后
+    // 客户端 JS 鉴权跳转尚未来得及执行时误判"已登录"。
+    const jumpedToQr = () => page.waitForURL(/qrlogin/, { timeout: 8000 }).then(() => true).catch(() => false);
     await page.goto(BOOK_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    const alreadyIn = await poll(async () => (isQrPage(page) ? null : page.url()), 15000, 1500);
-    if (alreadyIn) {
-      log('ALREADY LOGGED IN, url =', alreadyIn.slice(0, 90));
-      fs.writeFileSync(path.join(SC, 'login_ok.flag'), alreadyIn, 'utf8');
+    let needLogin = await jumpedToQr();
+    if (!needLogin) {
+      await page.goto(BOOK_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      needLogin = await jumpedToQr();
+    }
+    if (!needLogin) {
+      log('ALREADY LOGGED IN, url =', page.url().slice(0, 90));
+      fs.writeFileSync(path.join(SC, 'login_ok.flag'), page.url(), 'utf8');
       return 0;
     }
 
@@ -139,15 +146,15 @@ function saveQr(qr) {
       return 1;
     }
 
-    // 登录后验证：回到错题本页，轮询确认不再跳 qrlogin（最多 20s），验证通过才算成功
+    // 登录后验证：回到错题本页，等 20s 看是否被踢回登录页，没被踢回才算成功
     await page.goto(BOOK_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    const verified = await poll(async () => (isQrPage(page) ? null : page.url()), 20000, 1500);
-    if (!verified) {
+    const backToQr = await page.waitForURL(/qrlogin/, { timeout: 20000 }).then(() => true).catch(() => false);
+    if (backToQr) {
       log('VERIFY FAILED —— 扫码后仍未进入错题本，请重跑本脚本');
       return 1;
     }
     log('verify: OK');
-    fs.writeFileSync(path.join(SC, 'login_ok.flag'), verified, 'utf8');
+    fs.writeFileSync(path.join(SC, 'login_ok.flag'), page.url(), 'utf8');
     log('>>> 登录成功，可执行 scripts/02_scrape.js');
     return 0;
   } finally {

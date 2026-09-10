@@ -176,7 +176,8 @@ const manifest = [];
 const usedNames = new Set();
 for (const [key, list] of Object.entries(bySubject)) {
   let name = safe(key);
-  while (usedNames.has(name)) name = safe(key).slice(0, 36) + '_' + (usedNames.size + 1); // 截断后重名防护
+  let n = usedNames.size + 1; // 递增计数器：候选名也被占用时继续 +1，绝不死循环
+  while (usedNames.has(name)) name = safe(key).slice(0, 36) + '_' + (n++);
   usedNames.add(name);
   const chunks = Math.max(1, Math.ceil(list.length / CHUNK));
   for (let i = 0; i < chunks; i++) {

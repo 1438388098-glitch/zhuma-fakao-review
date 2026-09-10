@@ -52,9 +52,10 @@ function parseSev(cell) {
   return m ? 'P' + m[1] : null;
 }
 
-/** 解析报告的「结论摘要」小节：- P0: n 条, P1: n 条 ...；没有该小节返回 null */
+/** 解析报告的「结论摘要」小节：- P0: n 条, P1: n 条 ...；没有该小节返回 null。
+ *  节界兼容 h2–h6 子标题（`###` 子节里的数字不会误算进摘要）。 */
 function parseSummary(txt) {
-  const sec = txt.match(/##\s*结论摘要[\s\S]*?(?=\n##\s|\s*$)/);
+  const sec = txt.match(/^##\s*结论摘要[\s\S]*?(?=\n#{2,6}\s|\s*$)/m);
   if (!sec) return null;
   const out = {};
   for (const m of sec[0].matchAll(/P([0-3])\s*[:：]\s*(\d+)/g)) out['P' + m[1]] = Number(m[2]);
@@ -106,20 +107,22 @@ function parseReport(file) {
 const files = fs.readdirSync(REVIEWS).filter(f => f.endsWith('.md') && !f.startsWith('_'));
 if (!files.length) { console.error('scrape/reviews/ 下没有审查报告'); process.exit(2); }
 
-// 报告时效检查：报告早于笔记最后修改时间 => 笔记在审查后被修订过，统计可能已过时
+// 报告时效检查：报告早于笔记最后修改时间 => 笔记在审查后被修订过，统计可能已过时。
+// 汇总成一条告警，避免修订轮下逐报告刷屏淹没真正的解析告警。
 let newestNote = 0;
 if (fs.existsSync(NOTES)) {
   for (const f of fs.readdirSync(NOTES)) {
     try { newestNote = Math.max(newestNote, fs.statSync(path.join(NOTES, f)).mtimeMs); } catch (e) { /* ignore */ }
   }
 }
-for (const f of files) {
-  if (!newestNote) break;
-  try {
-    if (fs.statSync(path.join(REVIEWS, f)).mtimeMs < newestNote) {
-      warn(`报告 ${f} 早于笔记最新修改时间 —— 笔记在审查后被修订过，本清单可能含已修复的旧问题（修订完成后请勿重复修订）`);
-    }
-  } catch (e) { /* ignore */ }
+if (newestNote) {
+  const stale = [];
+  for (const f of files) {
+    try { if (fs.statSync(path.join(REVIEWS, f)).mtimeMs < newestNote) stale.push(f); } catch (e) { /* ignore */ }
+  }
+  if (stale.length) {
+    warn(`${stale.length} 份审查报告早于笔记最新修改时间（笔记在审查后被修订过）：${stale.join('、')} —— 修订时请以报告与当前笔记的比对为准，勿按本清单重复修订已修复项`);
+  }
 }
 
 let all = [];
