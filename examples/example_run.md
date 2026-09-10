@@ -89,9 +89,9 @@ Agent #8  → units/客观题二_商法_part2of3.json
 
 每个只回复一行：`notes/xxx.md — 知识点 27 个`
 
-39 个单元约 5 批完成。
+41 个单元：39 个由 subagent 完成（约 5 批），2 个小单元因 429 限流由主 Agent 手写。
 
-### 7. 阶段 5 审查与修订（新增）
+### 7. 阶段 5 审查与修订
 
 **5.1 分派审查 subagent**，按「科目 × 维度」：
 
@@ -106,7 +106,8 @@ Agent #8  → units/客观题二_商法_part2of3.json
 
 环境与自然资源法（9 题，小科目）→
   reviewer #7  D1+D2
-  reviewer #8  D3+D4+D5+D6
+  reviewer #8  D3+D4
+  reviewer #9  D5+D6
 ```
 
 每个输出到 `scrape/reviews/<科目>__<维度>.md`，只报告不改文件。
@@ -124,6 +125,8 @@ node scripts/05_review_aggregate.js --work D:\fakao-2026
 已写入： scrape/reviews/_fixlist.md
 ```
 
+（若出现 `WARN:` 行 —— 报告格式问题或摘要与表格条数不符 —— 先核对对应报告再继续。）
+
 **5.3 修订**：对 9 个有 P0/P1 的科目各派一个修订 subagent（模板 B），只改报告点到的地方。
 
 **5.4 复审**：对 6 条 P0 做验证。
@@ -135,12 +138,15 @@ node scripts/04_render_pdf.js --work D:\fakao-2026 --volume --desktop
 ```
 
 ```
-PDF: 客观题一_刑法.pdf 821KB questions=252
+PDF: 客观题一_刑法.pdf 821KB questions=252/252
 ...
-单科 PDF 完成： 18
-总册： 法考错题知识点笔记_总册.pdf 4261KB 科目=18 题=1655
+单科 PDF 完成： 18 → D:\fakao-2026\法考错题笔记
+总册： D:\fakao-2026\scrape\法考错题知识点笔记_总册.pdf 4261KB 科目=18 题=1655
 已另存到桌面： C:\Users\xxx\OneDrive\桌面\法考错题知识点笔记_总册.pdf
+提示：若桌面在 OneDrive 同步范围内，该 PDF 将同步到微软云。
 ```
+
+（`questions=252/252` 中分母是 manifest 题数、分子是实际收录数；若有分片缺笔记会先打 `WARN 缺笔记:` 行，且退出码为 1 —— 补齐后再交付。）
 
 ### 9. 阶段 7 交付
 

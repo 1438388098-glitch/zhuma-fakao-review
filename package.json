@@ -1,0 +1,13 @@
+{
+  "name": "zhuma-fakao-review",
+  "version": "1.1.0",
+  "private": true,
+  "description": "竹马法考错题本 → 知识点笔记 PDF（含多维审查闭环）",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16"
+  },
+  "dependencies": {
+    "playwright-core": "^1.42.0"
+  }
+}

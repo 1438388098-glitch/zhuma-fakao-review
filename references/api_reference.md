@@ -14,10 +14,10 @@
 | `appname` | `zhuma` |
 | `channel` | `zhumaWeb` —— **缺失会返回 `406 无效的channel`** |
 | `clienttype` | `web` |
-| `accept-q` | 前端生成的校验串，原样带上即可 |
+| `accept-q` | 前端生成的校验串，原样带上即可（实测同一会话内对多次请求复用同一值可行；但这是机器人特征，若遇批量失败/限流，先重开页面重新抓头） |
 | `Content-Type` | **必须显式设为 `application/json`** —— 否则 fetch 默认 `text/plain`，服务端报 `Content type 'text/plain;charset=UTF-8' not supported` |
 | `ts` | 毫秒时间戳，每次请求刷新为 `Date.now()` |
-| `nonce` | 随机串 |
+| `nonce` | 前端生成的随机串 —— **实测服务端不校验，脚本无需复用**（02_scrape.js 的 KEEP_HEADERS 不含它） |
 
 抓头代码模式：
 
@@ -26,7 +26,8 @@ let real = null;
 page.on('request', r => {
   if (/java-api/.test(r.url()) && !real && r.headers()['token']) real = r.headers();
 });
-// 之后构造 H：保留上表字段 + Content-Type=application/json + ts=Date.now()
+// 之后构造 H：保留上表"需复用"字段（token/mtoken/stoken/appname/channel/clienttype/accept-q）
+// + Content-Type=application/json + ts=Date.now()；nonce 不需要
 ```
 
 ## 二、三个核心接口
@@ -105,6 +106,7 @@ POST /java-api/api/error/question/getErrorQuestionAnalysisByIdV2
 | `tagName` | 题型（单选题/多选题/不定项） |
 | `difficulty` | 难度（1–5） |
 | `score` | 分值 |
+| `year` | 年份（数字，用于笔记按年份排序/标注） |
 | `noteValue` | 用户自己写的笔记（可能为空） |
 | `videoUrl` | 讲解视频地址 |
 | `userOptions` / `userAnswer` | **恒为 null** —— 竹马不保存错选的具体选项 |

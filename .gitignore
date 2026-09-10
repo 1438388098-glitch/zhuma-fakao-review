@@ -1,0 +1,9 @@
+# 运行产物 / 敏感数据，禁止入库
+scrape/
+node_modules/
+qr_login.png
+qr_login.jpg
+login_ok.flag
+state.json
+*.log
+*.tmp-*

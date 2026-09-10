@@ -48,25 +48,34 @@ agent_created: true
 ```
 <工作目录>/
 ├── study_profile.json          # 学情档案（阶段 0 沉淀，贯穿后续）
+├── qr_login.png                # 登录二维码（扫码成功后可删）
 ├── scrape/
+│   ├── profile/                # 浏览器持久 profile（登录态 cookie，敏感，勿入云同步/分享）
+│   ├── login_ok.flag           # 登录成功标记（01 写，编排方读）
 │   ├── catalogs.json           # 科目→章节 目录树 + 每章题数
+│   ├── chapter_sets.json       # 各章题目 id 清单（断点续跑用）
+│   ├── leaves.json             # 有题章节清单
 │   ├── questions.json          # 全量题目：题干/选项/正确答案/解析/来源…
 │   ├── units_manifest.json     # 处理单元清单（供 subagent 分工）
 │   ├── units/*.json            # 各单元题目分片
 │   ├── notes/*.md              # 各单元的知识点笔记（Markdown 中间产物）
 │   ├── reviews/*.md            # 各科目各维度的审查报告 + _fixlist.md 修订清单
-│   └── pdf/*.pdf               # 按科目渲染的 PDF（附同名 .html 预览）
-└── 法考错题笔记_<N>科/          # 最终交付目录（按科目 PDF 汇总）
+│   ├── pdf/*.pdf               # 按科目渲染的 PDF（附同名 .html 预览）
+│   ├── pdf_manifest.json       # 渲染结果清单
+│   └── 法考错题知识点笔记_总册.pdf   # 可选总册（不在 pdf/ 子目录，注意路径）
+└── 法考错题笔记/                # 最终交付目录（按科目 PDF 汇总，固定目录名）
 ```
 
-可选额外产出：`法考错题知识点笔记_总册.pdf`（封面 + 目录 + 全部科目 + PDF 书签），可另存到桌面。
+总册是否生成由 `study_profile.json` 的 `output_granularity` 决定（`per_subject` 不生成；`volume` / `both` 生成，默认），命令行 `--volume` / `--no-volume` 可显式覆盖。
 
 ## 前置条件
 
-- Windows + 本机已安装 Google Chrome。工作流复用本机 Chrome，不下载 Chromium（国内下载 `storage.googleapis.com` 常超时）。
-- Node.js 与 `playwright-core`。若缺失，在隔离目录安装后设置 `NODE_PATH`：
-  `npm install playwright-core --prefix <隔离目录>`
+- 以 Windows 为主（macOS/Linux 探测逻辑存在但未实测），本机已安装 Google Chrome 或 Microsoft Edge；也可用 `CHROME_PATH` 指定浏览器路径。工作流复用本机浏览器，不下载 Chromium（国内下载 `storage.googleapis.com` 常超时）。
+- Node.js 与 `playwright-core`（PDF 书签需要 **≥ 1.42**）。若缺失，在隔离目录安装后设置 `NODE_PATH`：
+  `npm install playwright-core@<固定版本> --prefix <隔离目录>`（建议固定版本号，避免浮动升级）
+  安装后验证：`node -e "require('playwright-core')"` 无报错即 OK。
 - 网络可访问 `zhumavip.com` 及其静态资源域。
+- 终端若为 GBK 代码页（部分 cmd/PowerShell 默认），脚本中文输出可能乱码：Git Bash 下正常，或先 `chcp 65001`。
 
 环境约定与避坑详见 `references/workflow.md`。
 
@@ -75,6 +84,8 @@ agent_created: true
 ### 阶段 0：需求对齐（必须执行，不可跳过）
 
 动手抓取前**必须先提问**，把排版偏好与学情问清楚。用 `AskUserQuestion`，一次问 3–4 个（工具上限 4 个），不要一口气抛太多。
+
+**提问前必须向用户说明数据去向**：后续会把错题内容与学情信息作为提示词发送给你所使用的 AI 模型服务（subagent 由 LLM 驱动）；数据仅用于生成笔记，不向其他第三方发送。用户接受后再继续。
 
 **第一批（必要）**
 
@@ -90,7 +101,7 @@ agent_created: true
 
 若用户说"别问了，直接做"，则采用全部默认值（紧凑 + 两者都要 + 综合），但在动手前**用一句话复述确认**。
 
-结果写入 `<工作目录>/study_profile.json`：
+结果写入 `<工作目录>/study_profile.json`。**注意枚举值**：`layout` 写英文（紧凑→`compact` / 标准→`normal` / 宽松→`loose`），`output_granularity` 写英文（每科一份→`per_subject` / 合成一本→`volume` / 都要→`both`），`note_focus` 写英文（梳理→`outline` / 易错→`traps` / 速记→`rules` / 综合→`comprehensive`）；**填进 subagent 提示词时换回中文释义**（模板里有对照）。
 
 ```json
 {
@@ -121,14 +132,15 @@ agent_created: true
 
 运行 `scripts/01_login.js`：
 
-- 用 `playwright-core` + 本机 Chrome，以**固定 userDataDir**（`<工作目录>/scrape/profile`）启动；
-- 打开 `https://www.zhumavip.com/w/qrlogin`，点击登录卡片右上角图标切到扫码模式；
-- 二维码导出为 PNG，用 `present_files` 发给用户，请其用**竹马 APP**扫码；
-- 轮询最多 12 分钟检测登录成功，成功即落盘登录态。
+- 用 `playwright-core` + 本机 Chrome/Edge，以**固定 userDataDir**（`<工作目录>/scrape/profile`）启动；
+- 打开 `https://www.zhumavip.com/w/qrlogin`，若页面不是扫码模式则点击登录卡片右上角图标切换；
+- 二维码导出为 PNG（`qr_login.png`，若站点返回 JPEG 则为 `.jpg`），用 `present_files` 发给用户，请其用**竹马 APP** 扫码；
+- 轮询最多 12 分钟检测登录成功（`--wait-min` 可调），二维码过期会自动刷新重取（需把新码再发给用户）；
+- 成功后写 `scrape/login_ok.flag` 并经二次验证（回到错题本页确认不再跳登录页）。
 
 **关键细节（不要改错）**：切扫码模式的图标是**用 JS 属性绑定 onclick 的 `<img>`**，CSS 选择器 `img[onclick]` 匹配不到，必须用 `i.onclick` 属性过滤。详见 `references/workflow.md`。
 
-登录后后续脚本复用同一 profile，**不必重复扫码**。
+登录态只存在 `scrape/profile/`，后续脚本复用同一 profile，**不必重复扫码**；该目录含会话 cookie，属敏感数据，勿分享、勿放进云同步/公共目录。
 
 ### 阶段 2：全量抓取
 
@@ -138,15 +150,19 @@ agent_created: true
 2. **拉每章题目** —— `getQuestionSetFromKnowledgeListV2`，得到题目 id 与 `answerErrorId`。
 3. **逐题拉详情** —— `getErrorQuestionAnalysisByIdV2`（参数 `questionId` + `answerRecordId`），拿到题干、选项、**正确答案**、**官方解析**、来源年份卷题号、难度、题型。
 
-结果写入 `scrape/questions.json`，每 20 题落盘，中断重跑自动跳过已抓题目。
+结果写入 `scrape/questions.json`，每 20 题原子落盘，中断重跑自动跳过已抓题目。
+
+**健壮性约定**：页面内 fetch 带 20s 超时；连续失败 10 次自动熔断；失败按指数退避（`--delay` 默认 150ms、下限 100ms）。**退出码**：0 成功；1 有失败或目录为空（直接重跑可续抓）；2 未登录/鉴权头未捕获（先重跑 01_login.js）。目录接口失败的组不会写入缓存，重跑自动重试。
 
 **必须向用户说明的限制**：竹马的 `userOptions` / `userAnswer` 恒为 `null` —— 它只记录"哪些题做错了"，**不保存当时勾选的具体选项**，因此**"我的错选"拿不到**；正确答案与完整解析可用。
 
 ### 阶段 3：切分处理单元
 
-运行 `scripts/03_build_units.js`：按科目分组，每单元 ≤ 55 题（`--chunk` 可调）切成 `scrape/units/*.json`，生成 `units_manifest.json`。
+运行 `scripts/03_build_units.js`：按科目分组，每单元 ≤ 55 题（`--chunk` 可调，1–500）切成 `scrape/units/*.json`，生成 `units_manifest.json`。
 
 **为什么切块**：单科目最多可达 250+ 题，交给一个 subagent 会产出过长且易漏；切成 55 题单元可让每个 subagent 专注并支持并行。
+
+**注意**：重跑会**删除并重建** `units/` —— 若此前已生成过笔记，重切分后旧笔记与 manifest 可能错位，必须重新执行阶段 4。选项/答案解析失败的题目会逐条告警；若全部失败（站点字段变动）脚本会中止。
 
 ### 阶段 4：subagent 并行生成笔记
 
@@ -175,7 +191,7 @@ agent_created: true
 
 **5.1 分派审查 subagent（并行）**
 
-审查采用「**按科目 × 按维度**」分派，而不是一个人看完一个科目的所有方面 —— 每个 reviewer 只盯一个维度，注意力集中、维度之间还能交叉验证。
+审查采用「**按科目 × 按维度**」分派，而不是一个人看完一个科目的所有方面 —— 每个 reviewer 主盯一个维度（小科目允许相邻维度合并），注意力集中、维度之间还能交叉验证。
 
 六个维度（定义在 `references/review_dimensions.md`）：
 
@@ -198,7 +214,7 @@ agent_created: true
 
 **5.2 汇总**
 
-运行 `scripts/05_review_aggregate.js`，把全部报告解析合并成 `scrape/reviews/_fixlist.md`，按科目与严重度（P0/P1/P2/P3）排序，并列出需要修订的科目。
+运行 `scripts/05_review_aggregate.js`，把全部报告解析合并成 `scrape/reviews/_fixlist.md`，按科目与严重度（P0/P1/P2/P3）排序，并列出需要修订的科目。脚本内置防呆：严重度容忍加粗/后缀写法；解析条数与各报告「结论摘要」交叉核对，不一致即告警；**有报告却零解析时按错误退出（exit 2），绝不产出"无需修订"的假绿灯**。汇总后请检查输出里的 WARN 行。
 
 **5.3 修订**
 
@@ -214,11 +230,12 @@ agent_created: true
 
 ### 阶段 6：渲染 PDF
 
-1. `scripts/04_render_pdf.js` —— 按科目合并各 part 的 Markdown，渲染单科 PDF 到 `scrape/pdf/`，并复制到 `法考错题笔记_<N>科/`。
-   合并时把第 2 部分起的标题**统一降一级**并插入「第 N 部分（续）」分隔，避免同科目出现多个重复一级标题。
-2. `scripts/04_render_pdf.js --volume` —— 生成总册：封面 + 目录 + 全部科目分节 + PDF 书签（`outline: true, tagged: true`）。
-
-排版样式集中在 `assets/pdf_style.css`，三种密度通过切换 CSS 变量实现。
+1. 运行 `scripts/04_render_pdf.js`（一次调用同时渲染单科与总册，是否带总册见下方规则）：
+   - 按科目合并各 part 的 Markdown，渲染单科 PDF 到 `scrape/pdf/`，并复制到 `法考错题笔记/`；
+   - 合并时把第 2 部分起的标题**统一降一级**并插入「第 N 部分（续）」分隔，笔记开头与封面重复的一级标题会被去掉，避免书签重复；
+   - **总册规则**：`study_profile.json` 的 `output_granularity` 为 `volume` / `both` 时在命令行加 `--volume`（`per_subject` 时不加；`--volume` / `--no-volume` 可显式覆盖）。总册落盘为 `scrape/法考错题知识点笔记_总册.pdf`，含封面 + 目录 + 全部科目分节 + PDF 书签（需 `playwright-core >= 1.42`）；
+   - 渲染前自动剥离笔记里的修订记录行与 HTML 注释；缺失/空的笔记分片会逐个告警，封面按**实际收录**计数（不虚报），存在缺失时退出码为 1 —— 交付前先补齐。
+2. 排版样式集中在 `assets/pdf_style.css`，三种密度通过切换 CSS 变量实现。
 
 ### 阶段 7：交付与复盘
 
@@ -228,16 +245,23 @@ agent_created: true
 
 ## 脚本清单
 
-| 脚本 | 作用 | 关键参数 |
-|---|---|---|
-| `scripts/lib/env.js` | 环境探测（Chrome / Node / 桌面路径）与公共工具 | — |
-| `scripts/01_login.js` | 扫码登录，固定 profile | `--work <目录>` |
-| `scripts/02_scrape.js` | 目录 + 题目 + 详情，断点续跑 | `--work <目录>` `--groups 1,2` |
-| `scripts/03_build_units.js` | 切分处理单元 | `--work <目录>` `--chunk 55` |
-| `scripts/04_render_pdf.js` | 渲染单科 PDF；`--volume` 生成总册 | `--work <目录>` `--volume` `--desktop` |
-| `scripts/05_review_aggregate.js` | 汇总审查报告 → 修订清单 | `--work <目录>` |
+按**执行顺序**排列（注意：`05` 在 `04` 之前运行 —— 先审查修订、后渲染）：
 
-所有脚本从 `<工作目录>/study_profile.json` 读取排版与学情，缺失时使用默认值。
+| 执行顺序 | 脚本 | 作用 | 关键参数 |
+|---|---|---|---|
+| 1 | `scripts/01_login.js` | 扫码登录，固定 profile | `--work <目录>` `--wait-min 12` |
+| 2 | `scripts/02_scrape.js` | 目录 + 题目 + 详情，断点续跑 | `--work <目录>` `--groups 1,2` `--delay 150` |
+| 3 | `scripts/03_build_units.js` | 切分处理单元 | `--work <目录>` `--chunk 55` |
+| 4 | （subagent 生成笔记，阶段 4） | — | — |
+| 5 | （subagent 审查，阶段 5.1） | — | — |
+| 6 | `scripts/05_review_aggregate.js` | 汇总审查报告 → 修订清单 | `--work <目录>` |
+| 7 | （subagent 修订/复审，阶段 5.3–5.4） | — | — |
+| 8 | `scripts/04_render_pdf.js` | 渲染单科 PDF；`--volume` 生成总册 | `--work <目录>` `--volume` `--desktop` |
+| — | `scripts/lib/env.js` | 环境探测与公共工具（被上述脚本引用，不单独运行） | — |
+
+**退出码约定**（01/02/03/04/05 一致遵守）：0 成功；1 完成但存在失败/缺失（通常重跑即可续抓）；2 缺输入或未登录（按报错提示先补前置步骤）。
+
+排版由 `scripts/04_render_pdf.js` 从 `<工作目录>/study_profile.json` 的 `layout` 读取；学情字段由阶段 4/5 的 subagent 提示词注入；字段缺失时用 `env.js` 的 `DEFAULT_PROFILE` 兜底，不会中断。
 
 ## 参考文档
 
@@ -251,6 +275,7 @@ agent_created: true
 | `assets/review_prompt_template.md` | 审查 / 修订 / 复审三个 subagent 提示词模板 |
 | `assets/pdf_style.css` | PDF 排版样式（紧凑 / 标准 / 宽松三档） |
 | `examples/example_run.md` | 典型示例：从对话到交付物的完整走查 |
+| `SECURITY_AUDIT.md` | 安全审计：恶意代码扫描、凭据与数据流说明、剩余风险 |
 
 ## 已知限制
 
@@ -258,4 +283,5 @@ agent_created: true
 2. **仅覆盖客观题**。主观题错题本结构不同，未适配。
 3. **依赖内部接口**，竹马前端改版可能导致接口变动；届时按 `references/api_reference.md` 的「如何重新发现接口」处理。
 4. **登录态会过期**，过期后重跑 `01_login.js` 重新扫码即可。
-5. 合并型 PDF 中，各单元内部的章节编号彼此独立，会出现编号重起 —— 已用「第 N 部分（续）」缓解；如需全局连续编号需额外处理。
+5. 总册 PDF 中，各单元内部的章节编号彼此独立，会出现编号重起 —— 已用「第 N 部分（续）」缓解；如需全局连续编号需额外处理。
+6. 错题内容与学情会作为提示词发送给你所使用的 AI 模型服务商（subagent 由 LLM 驱动）；若桌面在 OneDrive 同步范围内，`--desktop` 会把总册 PDF 同步到微软云。

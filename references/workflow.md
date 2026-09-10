@@ -4,21 +4,22 @@
 
 点击章节会跳转到做题页 `/w/doErrorExercises?...`，该页面**初始只显示题干与选项**，答案与解析要"交卷"后才出。而交卷会**写入用户的作答记录**，有动到错题本数据的风险 —— 不能碰。
 
-接口路线完全只读，且一次返回全部内容（题干 + 选项 + 正确答案 + 官方解析 + 来源），1661 道题约 9 分钟抓完。
+接口路线完全只读，且一次返回全部内容（题干 + 选项 + 正确答案 + 官方解析 + 来源），1661 道题（含跨章节重复，按题目 id 去重后 1655 道）约 9 分钟抓完。
 
 ## 二、环境约定与避坑
 
 ### 1. 用本机 Chrome，不要下载 Chromium
 
-`agent-browser install` 从 `storage.googleapis.com` 下载 Chrome for Testing（约 196MB），国内极易超时（实测下到 30% 断流）。
+playwright 默认的 `chromium.install()` 会从 `storage.googleapis.com` 下载 Chrome for Testing（约 196MB），国内极易超时（实测下到 30% 断流）。
 
-改为指定本机 Chrome：
+本技能的脚本统一改用 `playwright-core` + 本机浏览器（Chrome 或 Edge），自动探测 + 可用 `CHROME_PATH` 覆盖：
 
 ```js
+const { chromium } = require('playwright-core');
 chromium.launchPersistentContext(profileDir, { executablePath: '<本机 chrome.exe>' })
 ```
 
-若必须走 agent-browser，用环境变量 `AGENT_BROWSER_EXECUTABLE_PATH` 指向本机 Chrome 即可跳过下载。
+历史方案 agent-browser 的环境变量 `AGENT_BROWSER_EXECUTABLE_PATH` 仍被兼容识别（env.js 探测链），但不要再依赖它。
 
 ### 2. 固定 userDataDir，避免登录态丢失
 
@@ -58,18 +59,20 @@ chromium.launchPersistentContext(profileDir, { executablePath: '<本机 chrome.e
   ```js
   const cands = [...document.querySelectorAll('img')].filter(i => i.onclick);
   ```
-- 二维码是 `data:image/png;base64,...`（约 212×212），取出后解码存成 PNG 发给用户扫。
+- 二维码是 `data:image/png;base64,...`（约 212×212），取出后解码校验魔数再存成图片发给用户扫（若站点改返回 JPEG，脚本会存成 `qr_login.jpg` 并在日志说明）。
 - 扫码方是**竹马 APP**，不是微信。
-- 二维码有效期短（通常几分钟），若用户没及时扫，重新跑一次 `01_login.js` 生成新码即可。
-- 检测登录成功：URL 不再包含 `qrlogin`，或页面文本出现「退出」。
+- 二维码有效期短（通常几分钟）。脚本轮询时检测到「失效/过期」提示会**自动刷新重取**，但要记得把新码再发给用户。
+- 检测登录成功：URL 不再包含 `qrlogin`，或页面文本出现「退出」。01_login.js 在判定成功后还会**二次验证**（回到错题本页确认不再跳登录页），验证通过才写 `scrape/login_ok.flag`。
+- 登录态只存 `scrape/profile/`；`login_ok.flag` 是给编排方快速判断用的标记文件，02/03 等脚本不读它。
 
 ## 四、抓取环节的关键细节
 
 - 接口参数与鉴权头见 `references/api_reference.md`。
-- **逐题加延迟**（默认 150ms），避免触发限流。
-- **每 20 题落盘**，支持断点续跑；`questions.json` 以题目 id 为 key，重跑自动跳过。
+- **逐题加延迟**（默认 150ms，下限 100ms），避免触发限流；失败按指数退避，连续失败 10 次自动熔断，页面内 fetch 带 20s 超时。
+- **每 20 题原子落盘**（tmp+rename，中断不留截断文件），支持断点续跑；`questions.json` 以题目 id 为 key，重跑自动跳过。跨章节重复题按 id 去重，只抓一次。
 - 章节题数与 `questions.json` 唯一 id 数可能略有出入（存在跨章节重复题，被 id 去重），这是正常的，交付时按唯一题数统计。
 - 若中途出现「登录信息错误」，说明登录态过期 —— 重跑 `01_login.js`，然后直接重跑 `02_scrape.js`（已抓部分会保留）。
+- 目录接口瞬时失败**不会**写入缓存（catalogs.json 只存成功结果），重跑自动重试该组。
 
 ## 五、笔记生成环节的关键细节
 
@@ -83,7 +86,7 @@ chromium.launchPersistentContext(profileDir, { executablePath: '<本机 chrome.e
 - **审查员绝对不能改文件**，只出报告；修订统一由修订员做。这是为了避免多人并发写同一文件产生冲突、以及"顺手重写"引入未审查内容。
 - D2 维度（答案一致性）要求 reviewer **回读原始 JSON** 逐题比对，只看笔记无法判断。
 - 大科目的 D6（跨单元衔接）必须单独派，因为它需要同时看多个 part。
-- 修订员只能改报告点到的问题，并在文件末尾追加 HTML 注释形式的修订记录（渲染器会忽略注释）。
+- 修订员只能改报告点到的问题，并在文件末尾追加一行 `<修订记录：…>` —— 渲染器（04_render_pdf.js）会自动剥离该行，它不会出现在 PDF 里。审查报告的表格单元格内禁止竖线与换行，严重度只写 P0–P3（汇总脚本按此解析，违反会告警甚至拒绝汇总）。
 
 ## 七、PDF 渲染环节的关键细节
 
@@ -102,9 +105,10 @@ chromium.launchPersistentContext(profileDir, { executablePath: '<本机 chrome.e
 |---|---|
 | 科目数 | 18（客观题一 9 + 客观题二 9） |
 | 有题章节 | 180 |
-| 唯一错题数 | 1655 |
+| 章节预期题数合计 | 1661（含跨章节重复） |
+| 唯一错题数 | 1655（按题目 id 去重后） |
 | 处理单元（≤55 题） | 41 |
 | 抓取耗时 | 约 9 分钟 |
-| 笔记生成 subagent | 39 个（5 批并行） |
+| 笔记生成 subagent | 39 个（5 批并行；另 2 个单元因 429 限流由主 Agent 手写，41 − 39 = 2） |
 | 单科 PDF | 18 份，合计约 8.3MB |
 | 总册 | 129 页，约 4.2MB |

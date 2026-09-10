@@ -50,9 +50,9 @@
 
 | 字段 | 取值 | 对笔记的影响 |
 |---|---|---|
-| `layout` | compact / normal / loose | 通过 CSS 变量控制字号、行高、页边距、表格密度 |
-| `output_granularity` | per_subject / volume / both | 决定渲染阶段是否生成总册 |
-| `note_focus` | outline / traps / rules / comprehensive | 决定每个知识点里"体系描述"与"易错辨析"的比例 |
+| `layout` | 紧凑→`compact` / 标准→`normal` / 宽松→`loose`（json 写英文枚举） | 通过 CSS 变量控制字号、行高、页边距、表格密度（仅 `04_render_pdf.js` 读取） |
+| `output_granularity` | 每科一份→`per_subject` / 合成一本→`volume` / 都要→`both` | 由主 Agent 据此决定渲染时是否给 04 传 `--volume`（04 也识别该字段，`--no-volume` 可显式取消总册） |
+| `note_focus` | 梳理→`outline` / 易错→`traps` / 速记→`rules` / 综合→`comprehensive` | 决定每个知识点里"体系描述"与"易错辨析"的比例（json 存英文，**填进提示词时换中文释义**） |
 | `weak_subjects` | 科目名数组 | 这些科目篇幅可放大到 1.3–1.5 倍，易错点写得更细；其余科目可压缩 |
 | `review_round` | 一轮 / 二轮 / 三轮 / 考前一周 | 一轮补基础概念与体系；二轮重辨析与对比表；三轮只留高频结论与口诀 |
 | `days_to_exam` | 数字 | ≤30 天时每科开头加「本阶段优先掌握 Top 5 知识点」 |

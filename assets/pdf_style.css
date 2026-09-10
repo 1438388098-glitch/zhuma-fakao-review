@@ -7,6 +7,8 @@
  * 默认值（compact）：9.3pt / 1.45 / 8.8pt / 0.8mm / 11mm / 10mm / 4mm / 1.2mm
  */
 
+/* @page 说明：用 page.pdf() 渲染时，CDP printToPDF 的 margin 参数优先，此处 margin 实际不生效；
+ * 保留它是为了浏览器直接打开同名 .html 预览时页边距接近成品。size: A4 两处一致，无害。 */
 @page { size: A4; margin: var(--margin-v) var(--margin-h); }
 
 * { box-sizing: border-box; }
@@ -52,9 +54,9 @@ h4 {
 
 h5, h6 { font-size: var(--doc-font); margin: calc(var(--gap-h) * 0.45) 0 calc(var(--gap-h) * 0.25); color: #444; page-break-after: avoid; }
 
-p { margin: 0 0 var(--gap-p); }
+p { margin: 0 0 var(--gap-p); orphans: 3; widows: 3; }
 ul, ol { margin: 0 0 calc(var(--gap-p) * 1.2); padding-left: 5mm; }
-li { margin-bottom: calc(var(--gap-p) * 0.35); }
+li { margin-bottom: calc(var(--gap-p) * 0.35); break-inside: avoid; }
 
 strong { color: #A32D2D; }
 
@@ -62,7 +64,7 @@ code {
   background: #F1EFE8;
   padding: 0 0.8mm;
   border-radius: 2px;
-  font-family: Consolas, monospace;
+  font-family: Consolas, "Microsoft YaHei", monospace;
   font-size: calc(var(--doc-font) * 0.95);
 }
 
@@ -74,6 +76,7 @@ blockquote {
   background: #F7F9FC;
   border-left: 3px solid #85B7EB;
   color: #444;
+  break-inside: avoid;
 }
 
 table {
