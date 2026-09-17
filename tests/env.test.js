@@ -12,7 +12,8 @@ const env = require('../scripts/lib/env.js');
 
 // ---------- parseArgs ----------
 test('parseArgs: --key value / --flag / 位置参数', () => {
-  const a = env.parseArgs(['node', 'x.js', '--work', 'D:/tmp', '--chunk', '55', '--dry', 'pos']);
+  // 注意契约：--key 后面跟着非 -- 开头的词会被当作值；无值 flag 放最后
+  const a = env.parseArgs(['node', 'x.js', '--work', 'D:/tmp', '--chunk', '55', 'pos', '--dry']);
   assert.strictEqual(a.work, 'D:/tmp');
   assert.strictEqual(a.chunk, '55');
   assert.strictEqual(a.dry, true);

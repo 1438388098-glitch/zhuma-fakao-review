@@ -53,12 +53,16 @@ function parseSev(cell) {
 }
 
 /** 解析报告的「结论摘要」小节：- P0: n 条, P1: n 条 ...；没有该小节返回 null。
- *  节界兼容 h2–h6 子标题（`###` 子节里的数字不会误算进摘要）。 */
+ *  兼容摘要位于文件末尾（其后无其他小节）的情况——此前用 /m 正则的 `\s*$`
+ *  会在空行处提前截断，导致摘要数字读不到、交叉核对静默失效。 */
 function parseSummary(txt) {
-  const sec = txt.match(/^##\s*结论摘要[\s\S]*?(?=\n#{2,6}\s|\s*$)/m);
-  if (!sec) return null;
+  const head = txt.match(/^#{2,6}\s*结论摘要.*$/m);
+  if (!head) return null;
+  const rest = txt.slice(head.index + head[0].length);
+  const end = rest.search(/^#{2,6}\s/m); // 下一个小节标题（若还有）
+  const body = end === -1 ? rest : rest.slice(0, end);
   const out = {};
-  for (const m of sec[0].matchAll(/P([0-3])\s*[:：]\s*(\d+)/g)) out['P' + m[1]] = Number(m[2]);
+  for (const m of body.matchAll(/P([0-3])\s*[:：]\s*(\d+)/g)) out['P' + m[1]] = Number(m[2]);
   return Object.keys(out).length ? out : null;
 }
 
