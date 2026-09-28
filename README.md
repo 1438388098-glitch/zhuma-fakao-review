@@ -1,4 +1,6 @@
-# zhuma-fakao-review · 竹马法考错题复习助手
+English · [简体中文](./README.zh-CN.md)
+
+# zhuma-fakao-review · ZhuMa Bar-Exam Wrong-Answer Review Assistant
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Git%20Bash-blue)
@@ -6,165 +8,165 @@
 ![playwright-core](https://img.shields.io/badge/playwright--core-%5E1.42-2CA6A4)
 [![CI](https://github.com/1438388098-glitch/zhuma-fakao-review/actions/workflows/ci.yml/badge.svg)](https://github.com/1438388098-glitch/zhuma-fakao-review/actions/workflows/ci.yml)
 
-> **English TL;DR** — A multi-agent pipeline that turns a bar-exam app's wrong-answer book into printable, subject-wise study notes (PDF). Seven stages: authenticated read-only scraping (resumable, atomic writes, circuit breaker) → knowledge-point merging → six-dimension AI review loop where P0 findings must be fixed and re-reviewed → typeset PDF with bookmarks. Ships with 19 tests including anti-"fake green light" guards, CI, and a [security self-audit](SECURITY_AUDIT.md) that found and fixed a High-severity credential issue — and then corrected its own inflated first-pass score.
+> **In one line** — A multi-agent pipeline that turns a bar-exam app's wrong-answer book into printable, subject-wise study notes (PDF). Seven stages: authenticated read-only scraping (resumable, atomic writes, circuit breaker) → knowledge-point merging → six-dimension AI review loop where P0 findings must be fixed and re-reviewed → typeset PDF with bookmarks. Ships with 22 tests including anti-"fake green light" guards, CI, and a [security self-audit](SECURITY_AUDIT.md) that found and fixed a High-severity credential issue — and then corrected its own inflated first-pass score.
 
-把竹马法考（zhumavip.com）错题本里的**全部错题**，变成一份**按科目分册、可直接背诵的知识点笔记（PDF）**——带六维 AI 审查闭环。
+Turn the **entire wrong-answer book** of the ZhuMa bar-exam prep app (zhumavip.com) into **subject-wise, recite-ready knowledge-point notes (PDF)** — with a six-dimension AI review loop.
 
-> 不是"把题目抄一遍"。它从错题反推反复考的重点知识点，补上**易错/易混点**，并结合你自己的薄弱科目、复习进度、学习习惯调整详略。
+> This is not "copying the questions over". It reverse-derives the repeatedly-tested knowledge points behind your wrong answers, fills in **error-prone / easily-confused points**, and adjusts the level of detail to your own weak subjects, review progress and study habits.
 
-这同时是一个 [ZCode / Claude Code](https://code.claude.com) **技能包（Skill）**：把它放进技能目录后，AI Agent 会按 `SKILL.md` 的七阶段流程自主编排脚本与 subagent，你只需要扫码和回答几个问题。
+This is also a [ZCode / Claude Code](https://code.claude.com) **skill package**: drop it into your skills directory and the AI agent will orchestrate the scripts and subagents through the seven-stage flow in `SKILL.md` — you only scan a QR code and answer a few questions.
 
 ---
 
-## ✨ 特性
+## ✨ Features
 
-- **全量抓取**：走竹马内部只读接口（不交卷、不动作答记录），拿到题干、选项、**正确答案**与**完整官方解析**——这是页面爬取拿不到的信息密度。实测 1655 道错题约 9 分钟抓完，断点续跑、原子落盘、熔断退避。
-- **个性化笔记**：先问学情（薄弱科目 / 复习轮次 / 距考天数 / 每日时长 / 习惯 / 目标），按知识点（而非题目顺序）合并去重，标注「考查 N 次」。
-- **六维审查闭环**：笔记生成后由多个 subagent 按「科目 × 维度」并行审查（法条准确性 / 答案一致性 / 覆盖完整性 / 格式合规 / 学员适配 / 跨单元衔接），汇总成修订清单，P0 问题必须修订并复审。汇总脚本内置防呆：**解析不出问题条目时直接报错，绝不产出"无需修订"的假绿灯**。
-- **紧凑排版 PDF**：单科分册 + 可选总册（封面 / 目录 / PDF 书签跳转），三档排版密度，可直接打印或在平板上批注。「易错/易混点」以浅蓝色块呈现（笔记的视觉主角），且整套样式**灰度安全**——黑白打印机下标签与层级仍可辨。
-- **防御性工程**：所有 JSON 落盘原子写（中断不留截断文件）、进程锁防并发、登录态只存本地浏览器 profile、subagent 提示词内置防注入与写入路径白名单。
+- **Full-volume scraping**: goes through ZhuMa's internal read-only APIs (no submitting answers, no touching answer records) to get question stems, options, **correct answers** and **full official explanations** — an information density page scraping cannot reach. Measured: 1,655 wrong answers scraped in about 9 minutes, with resumable checkpoints, atomic writes, and circuit-breaker backoff.
+- **Personalized notes**: first asks about your situation (weak subjects / review round / days to the exam / daily study hours / habits / goals), then merges and deduplicates by knowledge point (not question order), tagging "tested N times".
+- **Six-dimension review loop**: after the notes are generated, multiple subagents review them in parallel by "subject × dimension" (legal-provision accuracy / answer consistency / coverage completeness / format compliance / student fit / cross-unit cohesion) and aggregate into a revision list; P0 issues must be fixed and re-reviewed. The aggregation script has a built-in guard: **if it cannot parse any findings, it errors out immediately — it never produces a fake "no revisions needed" green light**.
+- **Compact typeset PDF**: per-subject volumes + optional master volume (cover / table of contents / PDF bookmarks), three typography-density presets, ready to print or annotate on a tablet. "Error-prone / easily-confused points" appear as light-blue blocks (the visual protagonist of the notes), and the whole style is **grayscale-safe** — labels and hierarchy remain distinguishable on a black-and-white printer.
+- **Defensive engineering**: every JSON file is written atomically (an interruption leaves no truncated files), process locks prevent concurrent runs, login state lives only in the local browser profile, and subagent prompts carry anti-injection clauses and write-path whitelists.
 
-## 🔄 工作流程
+## 🔄 Workflow
 
 ```mermaid
 flowchart LR
-    A["阶段 0\n需求对齐 + 学情采集"] --> B["01_login.js\n扫码登录（固定 profile）"]
-    B --> C["02_scrape.js\n全量抓取（断点续跑）"]
-    C --> D["03_build_units.js\n按科目切分单元"]
-    D --> E["阶段 4\nsubagent 并行生成笔记"]
-    E --> F["阶段 5.1\n六维并行审查"]
-    F --> G["05_review_aggregate.js\n汇总 → 修订清单"]
-    G --> H["阶段 5.3–5.4\n修订 + P0 复审"]
-    H --> I["04_render_pdf.js\n渲染单科 PDF / 总册"]
-    I --> J["阶段 7\n集中交付"]
+    A["Stage 0\nAlignment + student profile"] --> B["01_login.js\nQR login (fixed profile)"]
+    B --> C["02_scrape.js\nFull scrape (resumable)"]
+    C --> D["03_build_units.js\nSplit into subject units"]
+    D --> E["Stage 4\nParallel note generation by subagents"]
+    E --> F["Stage 5.1\nSix-dimension parallel review"]
+    F --> G["05_review_aggregate.js\nAggregate → revision list"]
+    G --> H["Stage 5.3–5.4\nRevise + P0 re-review"]
+    H --> I["04_render_pdf.js\nRender per-subject PDFs / master volume"]
+    I --> J["Stage 7\nFinal delivery"]
 ```
 
-> 注意执行顺序：**汇总脚本 `05` 在渲染脚本 `04` 之前**——先审查修订、后渲染交付。每个科目最多 250+ 题会被切成 ≤55 题的单元，交给并行 subagent 分别处理。
+> Mind the execution order: **the aggregation script `05` runs BEFORE the rendering script `04`** — review and revise first, render and deliver last. A subject with up to 250+ questions is split into units of ≤ 55 questions, handed to parallel subagents separately.
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
-### 0. 准备环境
+### 0. Prepare the environment
 
-- Windows + 本机已装 **Google Chrome 或 Microsoft Edge**（也可用 `CHROME_PATH` 指定；macOS/Linux 探测逻辑存在但未实测）
-- Node.js ≥ 16，安装 `playwright-core`（建议固定版本，PDF 书签需 ≥ 1.42）：
+- Windows + a local **Google Chrome or Microsoft Edge** install (or point `CHROME_PATH` at one; macOS/Linux detection logic exists but is untested)
+- Node.js ≥ 16, with `playwright-core` installed (pin the version; PDF bookmarks require ≥ 1.42):
 
 ```bash
-npm install playwright-core@1.49.1 --prefix <隔离目录>
-export NODE_PATH=<隔离目录>/node_modules
-node -e "require('playwright-core')"   # 验证安装，无输出即 OK
+npm install playwright-core@1.49.1 --prefix <isolated-dir>
+export NODE_PATH=<isolated-dir>/node_modules
+node -e "require('playwright-core')"   # verify install; no output means OK
 ```
 
-### 1. 安装为技能
+### 1. Install as a skill
 
 ```bash
-# 克隆到你的技能目录（ZCode / Claude Code 会自动发现 SKILL.md）
-git clone <本仓库地址> ~/.workbuddy/skills/zhuma-fakao-review
+# Clone into your skills directory (ZCode / Claude Code discovers SKILL.md automatically)
+git clone <this repo URL> ~/.workbuddy/skills/zhuma-fakao-review
 ```
 
-之后对 AI 说「把我的竹马错题整理成笔记」并附上错题本链接即可触发；也可以直接手动执行下面的脚本。
+Then tell the AI "organize my ZhuMa wrong answers into notes" with the error-book link to trigger it; or run the scripts manually as below.
 
-### 2. 手动跑流水线（可选）
+### 2. Run the pipeline manually (optional)
 
 ```bash
-# 1. 登录（生成二维码，用竹马 APP 扫；--wait-min 可调轮询时长，默认 12 分钟）
+# 1. Login (shows a QR code; scan it with the ZhuMa app; --wait-min adjusts polling, default 12 minutes)
 node scripts/01_login.js --work D:\fakao-2026
 
-# 2. 全量抓取（--delay 默认 150ms、下限 100ms）
+# 2. Full scrape (--delay defaults to 150ms, floor 100ms)
 node scripts/02_scrape.js --work D:\fakao-2026 --groups 1,2
 
-# 3. 切分处理单元（重跑会重建 units/，旧笔记需重新生成）
+# 3. Split into processing units (rerunning rebuilds units/; existing notes must be regenerated)
 node scripts/03_build_units.js --work D:\fakao-2026 --chunk 55
 
-# 4-5. 生成与审查笔记 —— 由 AI Agent 按 units_manifest.json 派发 subagent 并行完成
-#      提示词模板：assets/note_prompt_template.md、assets/review_prompt_template.md
-node scripts/05_review_aggregate.js --work D:\fakao-2026   # 汇总修订清单（先于渲染！）
-#      对有 P0/P1 的科目派修订 subagent，必要时复审
+# 4-5. Generate & review notes — dispatched by the AI agent as parallel subagents per units_manifest.json
+#      Prompt templates: assets/note_prompt_template.md, assets/review_prompt_template.md
+node scripts/05_review_aggregate.js --work D:\fakao-2026   # aggregate the revision list (BEFORE rendering!)
+#      Dispatch revision subagents for subjects with P0/P1 findings, re-review when necessary
 
-# 6. 渲染 PDF
-#    --volume 生成总册（默认由 study_profile.json 的 output_granularity 决定，--no-volume 可取消）
+# 6. Render PDFs
+#    --volume builds the master volume (by default decided by study_profile.json's output_granularity; --no-volume to skip)
 node scripts/04_render_pdf.js --work D:\fakao-2026 --volume --desktop
 ```
 
-**脚本退出码**：`0` 成功；`1` 完成但有失败/缺失（重跑即可续抓）；`2` 前置条件不满足（各脚本文件头有精确口径，如 02 的 2=未登录、01 的 2=找不到二维码、03/05 的 2=缺输入或参数错误）。
+**Script exit codes**: `0` success; `1` finished but with failures/missing items (just rerun to resume); `2` preconditions unmet (each script's file header documents the exact semantics, e.g. 02's 2 = not logged in, 01's 2 = QR code not found, 03/05's 2 = missing inputs or bad arguments).
 
-## 📊 一次完整运行的实测规模
+## 📊 Measured scale of one full run
 
-| 指标 | 数值 |
+| Metric | Value |
 |---|---|
-| 科目数 | 18（客观题一 9 + 客观题二 9） |
-| 有题章节 | 180 |
-| 唯一错题数 | 1655（章节预期合计 1661，差值为跨章节重复题，按 id 去重） |
-| 处理单元 | 41（每单元 ≤ 55 题） |
-| 抓取耗时 | 约 9 分钟 |
-| 笔记生成 subagent | 39 个（5 批并行；另 2 个单元因 429 限流由主 Agent 手写） |
-| 产出 | 18 份单科 PDF（8.3MB）+ 总册 129 页（4.2MB） |
+| Subjects | 18 (Objective Test I: 9 + Objective Test II: 9) |
+| Chapters with questions | 180 |
+| Unique wrong answers | 1,655 (chapter-level expectations sum to 1,661; the difference is questions repeated across chapters, deduplicated by id) |
+| Processing units | 41 (≤ 55 questions each) |
+| Scrape time | about 9 minutes |
+| Note-generation subagents | 39 (5 parallel batches; 2 units were hand-written by the main agent due to 429 rate limiting) |
+| Output | 18 per-subject PDFs (8.3 MB) + a 129-page master volume (4.2 MB) |
 
-## 📚 文档导航
+## 📚 Documentation map
 
-| 文件 | 内容 |
+| File | Contents |
 |---|---|
-| [SKILL.md](SKILL.md) | 技能主入口：目标 / 场景 / 输入输出 / 七阶段流程（AI Agent 按此执行） |
-| [references/api_reference.md](references/api_reference.md) | 竹马内部接口：鉴权头、三个核心接口参数与返回字段、错误码、接口变动时如何重新发现 |
-| [references/workflow.md](references/workflow.md) | 端到端流程详解、环境约定、踩坑清单 |
-| [references/review_dimensions.md](references/review_dimensions.md) | 六个审查维度的定义、要抓的问题、严重度分级、分派方式 |
-| [references/student_profile.md](references/student_profile.md) | 学情问卷全文、字段含义、如何映射到笔记风格 |
-| [assets/note_prompt_template.md](assets/note_prompt_template.md) | 笔记生成 subagent 提示词模板（复制填参即用） |
-| [assets/review_prompt_template.md](assets/review_prompt_template.md) | 审查 / 修订 / 复审三个 subagent 提示词模板 |
-| [assets/pdf_style.css](assets/pdf_style.css) | PDF 排版样式（紧凑 / 标准 / 宽松三档，CSS 变量驱动） |
-| [examples/example_run.md](examples/example_run.md) | 完整走查示例：从一句话到 18 份 PDF |
-| [SECURITY_AUDIT.md](SECURITY_AUDIT.md) | 安全审计：方法学、修复记录、剩余风险 |
+| [SKILL.md](SKILL.md) | Skill entry point: goal / scenarios / inputs & outputs / seven-stage flow (executed by the AI agent) |
+| [references/api_reference.md](references/api_reference.md) | ZhuMa internal APIs: auth headers, parameters and response fields of the three core endpoints, error codes, and how to re-discover endpoints when they change |
+| [references/workflow.md](references/workflow.md) | End-to-end flow in detail, environment conventions, pitfalls |
+| [references/review_dimensions.md](references/review_dimensions.md) | Definitions of the six review dimensions, what to catch, severity grading, dispatch method |
+| [references/student_profile.md](references/student_profile.md) | Full student-profile questionnaire, field meanings, how it maps to note style |
+| [assets/note_prompt_template.md](assets/note_prompt_template.md) | Note-generation subagent prompt template (fill in parameters and use) |
+| [assets/review_prompt_template.md](assets/review_prompt_template.md) | Review / revise / re-review subagent prompt templates |
+| [assets/pdf_style.css](assets/pdf_style.css) | PDF typography styles (compact / standard / relaxed, driven by CSS variables) |
+| [examples/example_run.md](examples/example_run.md) | Full walkthrough example: from one sentence to 18 PDFs |
+| [SECURITY_AUDIT.md](SECURITY_AUDIT.md) | Security audit: methodology, fix records, residual risks |
 
-## 🔒 隐私与数据流向（请务必阅读）
+## 🔒 Privacy and data flow (please read)
 
 > [!IMPORTANT]
-> 工作流整体有两条"出本机"的数据通道，使用前请知情：
+> The workflow as a whole has two channels that take data off this machine. Know this before use:
 
-- **对竹马平台只读**：不提交作答、不交卷、不修改账号数据；串行抓取且默认 150ms 间隔，仅抓取**本人账号**的错题，请遵守平台服务条款。
-- **脚本网络出口仅 `zhumavip.com`**：全部 URL 硬编码官方域名，无第三方上报。
-- **① AI 模型服务**：阶段 4/5 的 subagent 由 LLM 驱动，错题内容与你填写的学情会作为提示词发送给你所使用的模型服务商。数据仅用于生成笔记。
-- **② 云同步盘**：`--desktop` 会把总册 PDF 复制到桌面——若桌面在 OneDrive 同步范围内，该文件会同步到微软云。不需要云备份就别加 `--desktop`。
-- **本地敏感数据**：登录态（会话 cookie）只保存在 `<工作目录>/scrape/profile/`。脚本不写出任何凭据文件；请勿分享该目录、勿把它放进云同步或公共位置。清除方式：删除整个工作目录。
+- **Read-only toward the ZhuMa platform**: no submitting answers, no altering account data; serial scraping with a default 150 ms interval, fetching only the wrong answers of **your own account** — please comply with the platform's terms of service.
+- **Script network egress is `zhumavip.com` only**: every URL is hardcoded to the official domain, no third-party reporting.
+- **① AI model services**: the Stage 4/5 subagents are LLM-driven; wrong-answer content and the student profile you fill in are sent, as prompts, to whichever model provider you use. The data is used only to generate notes.
+- **② Cloud-synced disks**: `--desktop` copies the master-volume PDF to your desktop — if the desktop is inside OneDrive sync scope, that file syncs to Microsoft's cloud. Don't pass `--desktop` if you don't want cloud backup.
+- **Local sensitive data**: login state (session cookies) is stored only in `<working directory>/scrape/profile/`. The scripts never write any credentials file; do not share that directory, and do not put it in cloud sync or public locations. To wipe it: delete the whole working directory.
 
-## 🛠 故障排查
+## 🛠 Troubleshooting
 
-| 现象 | 处理 |
+| Symptom | Fix |
 |---|---|
-| `未找到 playwright-core` | 按快速开始第 0 步安装并设置 `NODE_PATH` 后重试 |
-| `未找到本机 Chrome / Edge` | 安装浏览器，或设置 `CHROME_PATH` 指向可执行文件 |
-| 02 退出码 2 | 未登录或登录态过期：重跑 `01_login.js` 后再跑 02（已抓数据保留） |
-| 02 退出码 1（有失败） | 直接重跑 02，自动从断点续抓 |
-| 05 退出码 2（零解析） | 审查报告格式不符：检查表格 6 列、严重度只写 P0–P3，重跑即可 |
-| 04 退出码 1（缺笔记） | 有分片没生成笔记：重跑阶段 4 对应 subagent 后再渲染 |
-| 卡在"另一个进程正在运行" | 删除 `scrape/.scrape.lock` 或 `scrape/.render.lock`（确认无并发后） |
-| 终端中文乱码 | 用 Git Bash，或先执行 `chcp 65001` |
+| `playwright-core not found` | Install per Quick Start step 0, set `NODE_PATH`, then retry |
+| `No local Chrome / Edge found` | Install a browser, or set `CHROME_PATH` to the executable |
+| 02 exits with code 2 | Not logged in or session expired: rerun `01_login.js`, then 02 (already-scraped data is kept) |
+| 02 exits with code 1 (some failures) | Just rerun 02; it resumes from the checkpoint |
+| 05 exits with code 2 (zero parsed findings) | Review report format mismatch: check the 6-column table and severities written only as P0–P3, then rerun |
+| 04 exits with code 1 (missing notes) | Some shards have no notes: rerun the Stage 4 subagents for them, then render |
+| Stuck on "another process is running" | Delete `scrape/.scrape.lock` or `scrape/.render.lock` (after confirming no concurrent run) |
+| Garbled Chinese in the terminal | Use Git Bash, or run `chcp 65001` first |
 
-## ⚠️ 已知限制
+## ⚠️ Known limitations
 
-1. **拿不到"我的错选"**——竹马接口 `userOptions` / `userAnswer` 恒为 `null`，只记录"哪些题错了"，不保存你当时勾了哪个选项。正确答案与官方解析是完整的。
-2. **仅覆盖客观题**（客观题一 / 客观题二），主观题错题本结构不同，未适配。
-3. **依赖竹马内部接口**，前端改版可能失效；届时按 `references/api_reference.md` 的「接口变动时如何重新发现」处理。
-4. **登录态会过期**，过期后重跑 `01_login.js` 重新扫码即可。
-5. 总册 PDF 中，各单元内部章节编号彼此独立，会出现编号重起（已用「第 N 部分（续）」缓解）。
+1. **"My wrong choices" are unavailable** — the ZhuMa API always returns `null` for `userOptions` / `userAnswer`: it records which questions were wrong, but not which option you picked. Correct answers and official explanations are complete.
+2. **Objective questions only** (Objective Test I / Objective Test II); the subjective-question error book has a different structure and is not supported.
+3. **Depends on ZhuMa's internal APIs**; a frontend revamp may break it — then follow "how to re-discover endpoints" in `references/api_reference.md`.
+4. **Login sessions expire**; when they do, rerun `01_login.js` and scan again.
+5. In the master-volume PDF, chapter numbering restarts inside each unit (mitigated with "Part N (continued)").
 
-## 🧪 质量保障
+## 🧪 Quality assurance
 
-本仓库经过两轮独立代码审查 + 复审验收（安全审计、逐行代码审查、文档一致性核查），全部发现已修复，过程留痕于 git 历史。核心保证：
+This repository went through two rounds of independent review plus re-review acceptance (security audit, line-by-line code review, documentation-consistency check); all findings were fixed, with the trail left in git history. The security self-audit found and fixed one High-severity issue — a plaintext login-token copy written to disk — and corrected its own inflated first-pass score (95 → 90); see [SECURITY_AUDIT.md](SECURITY_AUDIT.md). Core guarantees:
 
-- 原子写 + 断点续跑：任何一步中断都能安全重跑，不产生截断数据；
-- 失败可见：失败必告警、必影响退出码，不存在静默丢数据的"假绿灯"路径（汇总脚本对零解析结果直接报错）；
-- 注入防御：所有渲染路径先转义再拼接；subagent 提示词含防注入条款与写入路径白名单；
-- **平台无关设计**：机器相关的探测（Chrome/Edge 定位、桌面目录、Windows 保留文件名清洗）全部集中在 `scripts/lib/env.js` 运行时探测，不硬编码机器特定路径——换机器只需 Node + 本机浏览器，无需改代码；
-- **自动化测试**：`npm test`（node:test，22 例）覆盖参数解析、原子写、进程锁过期抢占、切分单元与 manifest、**假绿灯防护**（有报告但零解析必须 exit 2、摘要与表格条数交叉核对）等关键路径，全部基于临时目录的 CLI 端到端验证。
+- Atomic writes + resumable runs: any step can be interrupted and safely re-run, never producing truncated data;
+- Failures are visible: every failure warns and affects the exit code — there is no silent data-loss "fake green light" path (the aggregation script errors out on zero parsed findings);
+- Injection defense: every rendering path escapes before concatenation; subagent prompts carry anti-injection clauses and write-path whitelists;
+- **Platform-agnostic design**: machine-specific probing (Chrome/Edge discovery, desktop directory, Windows reserved-filename sanitization) is centralized in runtime detection in `scripts/lib/env.js`, with no machine-specific paths hardcoded — moving to another machine needs only Node + a local browser, no code changes;
+- **Automated tests**: `npm test` (node:test, 22 cases) covers argument parsing, atomic writes, process-lock expiry preemption, unit splitting & manifest, and **anti-"fake green light" guards** (a report with zero parsed findings must exit 2; summary vs table row counts cross-checked), all verified end-to-end via the CLI against temporary directories.
 
-详见 [SECURITY_AUDIT.md](SECURITY_AUDIT.md)。
+See [SECURITY_AUDIT.md](SECURITY_AUDIT.md) for details.
 
-## 📄 免责声明
+## 📄 Disclaimer
 
-- 本项目为**个人学习用途的非官方工具**，与竹马法考（zhumavip.com）及其运营方**无任何关联、合作或背书关系**。
-- `references/api_reference.md` 中记录的接口信息仅为本人在使用过程中对**自己账号可见数据**所作的技术观察记录，仅供学习交流；接口的最终解释权归平台运营方所有，平台有权随时变更或关闭。
-- 使用本工具即表示你理解并同意：**仅限抓取本人账号的错题数据**，遵守平台服务条款与适用法律；因使用不当（如高频抓取、用于商业用途、抓取他人数据）导致的账号限制或任何后果由使用者自行承担。
-- 脚本对平台仅做只读访问（不交卷、不动作答记录），并内置限速与退避；如平台方认为本项目侵犯其权益，请提 Issue，我会立即处理（下架相关内容或归档仓库）。
+- This project is an **unofficial tool for personal learning purposes**, with **no affiliation, cooperation with, or endorsement by** ZhuMa bar-exam prep (zhumavip.com) or its operator.
+- The API information recorded in `references/api_reference.md` consists solely of technical observations of **data visible to my own account** made while using the service, for study and exchange only; final interpretation of the APIs belongs to the platform operator, who may change or shut them down at any time.
+- By using this tool you understand and agree: **only scrape the wrong-answer data of your own account**, and comply with the platform's terms of service and applicable law; account restrictions or any other consequences caused by misuse (such as high-frequency scraping, commercial use, or scraping other people's data) are borne by the user.
+- The scripts access the platform read-only (no submitting answers, no touching answer records) and have built-in rate limiting and backoff; if the platform operator believes this project infringes its rights, please open an Issue and I will act immediately (remove the related content or archive the repository).
 
-## 📄 许可
+## 📄 License
 
-[MIT](LICENSE)。欢迎 fork 与改进——若竹马接口变动，请同步更新 `references/api_reference.md`。
+[MIT](LICENSE). Forks and improvements welcome — if the ZhuMa APIs change, please update `references/api_reference.md` accordingly.
