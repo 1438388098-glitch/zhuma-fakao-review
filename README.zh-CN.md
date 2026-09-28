@@ -58,7 +58,7 @@ node -e "require('playwright-core')"   # 验证安装，无输出即 OK
 
 ```bash
 # 克隆到你的技能目录（ZCode / Claude Code 会自动发现 SKILL.md）
-git clone <本仓库地址> ~/.workbuddy/skills/zhuma-fakao-review
+git clone https://github.com/1438388098-glitch/zhuma-fakao-review.git ~/.zcode/skills/zhuma-fakao-review
 ```
 
 之后对 AI 说「把我的竹马错题整理成笔记」并附上错题本链接即可触发；也可以直接手动执行下面的脚本。

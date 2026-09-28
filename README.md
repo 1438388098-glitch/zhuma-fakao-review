@@ -60,7 +60,7 @@ node -e "require('playwright-core')"   # verify install; no output means OK
 
 ```bash
 # Clone into your skills directory (ZCode / Claude Code discovers SKILL.md automatically)
-git clone <this repo URL> ~/.workbuddy/skills/zhuma-fakao-review
+git clone https://github.com/1438388098-glitch/zhuma-fakao-review.git ~/.zcode/skills/zhuma-fakao-review
 ```
 
 Then tell the AI "organize my ZhuMa wrong answers into notes" with the error-book link to trigger it; or run the scripts manually as below.
