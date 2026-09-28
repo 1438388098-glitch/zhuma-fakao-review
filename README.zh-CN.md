@@ -4,7 +4,7 @@
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Git%20Bash-blue)
-![Node](https://img.shields.io/badge/node-%3E%3D16-brightgreen)
+![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)
 ![playwright-core](https://img.shields.io/badge/playwright--core-%5E1.42-2CA6A4)
 [![CI](https://github.com/1438388098-glitch/zhuma-fakao-review/actions/workflows/ci.yml/badge.svg)](https://github.com/1438388098-glitch/zhuma-fakao-review/actions/workflows/ci.yml)
 
@@ -46,7 +46,7 @@ flowchart LR
 ### 0. 准备环境
 
 - Windows + 本机已装 **Google Chrome 或 Microsoft Edge**（也可用 `CHROME_PATH` 指定；macOS/Linux 探测逻辑存在但未实测）
-- Node.js ≥ 16，安装 `playwright-core`（建议固定版本，PDF 书签需 ≥ 1.42）：
+- Node.js ≥ 18，安装 `playwright-core`（建议固定版本，PDF 书签需 ≥ 1.42）：
 
 ```bash
 npm install playwright-core@1.49.1 --prefix <隔离目录>

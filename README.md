@@ -4,7 +4,7 @@ English · [简体中文](./README.zh-CN.md)
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Git%20Bash-blue)
-![Node](https://img.shields.io/badge/node-%3E%3D16-brightgreen)
+![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)
 ![playwright-core](https://img.shields.io/badge/playwright--core-%5E1.42-2CA6A4)
 [![CI](https://github.com/1438388098-glitch/zhuma-fakao-review/actions/workflows/ci.yml/badge.svg)](https://github.com/1438388098-glitch/zhuma-fakao-review/actions/workflows/ci.yml)
 
@@ -48,7 +48,7 @@ flowchart LR
 ### 0. Prepare the environment
 
 - Windows + a local **Google Chrome or Microsoft Edge** install (or point `CHROME_PATH` at one; macOS/Linux detection logic exists but is untested)
-- Node.js ≥ 16, with `playwright-core` installed (pin the version; PDF bookmarks require ≥ 1.42):
+- Node.js ≥ 18, with `playwright-core` installed (pin the version; PDF bookmarks require ≥ 1.42):
 
 ```bash
 npm install playwright-core@1.49.1 --prefix <isolated-dir>
