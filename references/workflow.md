@@ -110,5 +110,5 @@ chromium.launchPersistentContext(profileDir, { executablePath: '<本机 chrome.e
 | 处理单元（≤55 题） | 41 |
 | 抓取耗时 | 约 9 分钟 |
 | 笔记生成 subagent | 39 个（5 批并行；另 2 个单元因 429 限流由主 Agent 手写，41 − 39 = 2） |
-| 单科 PDF | 18 份，合计约 8.3MB |
-| 总册 | 129 页，约 4.2MB |
+| 单科 PDF | 18 份，合计约 10.1MB |
+| 总册 | 133 页，约 4.0MB |

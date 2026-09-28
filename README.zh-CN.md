@@ -97,7 +97,18 @@ node scripts/04_render_pdf.js --work D:\fakao-2026 --volume --desktop
 | 处理单元 | 41（每单元 ≤ 55 题） |
 | 抓取耗时 | 约 9 分钟 |
 | 笔记生成 subagent | 39 个（5 批并行；另 2 个单元因 429 限流由主 Agent 手写） |
-| 产出 | 18 份单科 PDF（8.3MB）+ 总册 129 页（4.2MB） |
+| 产出 | 18 份单科 PDF（约 10.1MB）+ 总册 133 页（约 4.0MB） |
+
+## 🖼 成品预览
+
+<p align="center">
+  <img src="docs/screenshots/sample-criminal-law.png" width="49%" alt="总册第 3 页：刑法分册开头，浅蓝色块为「易错/易混点」">
+  <img src="docs/screenshots/sample-criminal-procedure.png" width="49%" alt="总册第 24 页：刑事诉讼法，易错点蓝色块与对比表">
+</p>
+
+> 总册内页示例（左：刑法分册开头；右：刑事诉讼法内页）。浅蓝底色块即「易错/易混点」——笔记的视觉主角，黑白打印下退化为带边框的引用块。
+>
+> 数据来源：作者本人真实错题本（竹马法考导出，1,655 题），全程本地渲染成 PDF 后截图；截图已逐张人工核查，不含手机号、账号名、真实姓名等个人信息。
 
 ## 📚 文档导航
 

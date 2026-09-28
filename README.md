@@ -99,7 +99,18 @@ node scripts/04_render_pdf.js --work D:\fakao-2026 --volume --desktop
 | Processing units | 41 (≤ 55 questions each) |
 | Scrape time | about 9 minutes |
 | Note-generation subagents | 39 (5 parallel batches; 2 units were hand-written by the main agent due to 429 rate limiting) |
-| Output | 18 per-subject PDFs (8.3 MB) + a 129-page master volume (4.2 MB) |
+| Output | 18 per-subject PDFs (about 10.1 MB) + a 133-page master volume (about 4.0 MB) |
+
+## 🖼 Sample output
+
+<p align="center">
+  <img src="docs/screenshots/sample-criminal-law.png" width="49%" alt="Master volume page 3: Criminal Law section opening; light-blue blocks are pitfall/confusion points">
+  <img src="docs/screenshots/sample-criminal-procedure.png" width="49%" alt="Master volume page 24: Criminal Procedure; blue pitfall blocks and comparison tables">
+</p>
+
+> Inner pages of the master volume (left: opening of the Criminal Law section; right: an inner page of Criminal Procedure). The light-blue blocks are the "pitfall / confusion points" — the visual centerpiece of the notes; on a grayscale printer they degrade into bordered quote blocks.
+>
+> Data source: the author's own real error-book export (1,655 questions from ZhuMa), rendered to PDF entirely locally before screenshotting; the screenshots were manually reviewed page by page and contain no phone numbers, account names, real names, or other personal information.
 
 ## 📚 Documentation map
 
