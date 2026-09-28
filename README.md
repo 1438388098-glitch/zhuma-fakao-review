@@ -4,6 +4,9 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Git%20Bash-blue)
 ![Node](https://img.shields.io/badge/node-%3E%3D16-brightgreen)
 ![playwright-core](https://img.shields.io/badge/playwright--core-%5E1.42-2CA6A4)
+[![CI](https://github.com/1438388098-glitch/zhuma-fakao-review/actions/workflows/ci.yml/badge.svg)](https://github.com/1438388098-glitch/zhuma-fakao-review/actions/workflows/ci.yml)
+
+> **English TL;DR** — A multi-agent pipeline that turns a bar-exam app's wrong-answer book into printable, subject-wise study notes (PDF). Seven stages: authenticated read-only scraping (resumable, atomic writes, circuit breaker) → knowledge-point merging → six-dimension AI review loop where P0 findings must be fixed and re-reviewed → typeset PDF with bookmarks. Ships with 19 tests including anti-"fake green light" guards, CI, and a [security self-audit](SECURITY_AUDIT.md) that found and fixed a High-severity credential issue — and then corrected its own inflated first-pass score.
 
 把竹马法考（zhumavip.com）错题本里的**全部错题**，变成一份**按科目分册、可直接背诵的知识点笔记（PDF）**——带六维 AI 审查闭环。
 
