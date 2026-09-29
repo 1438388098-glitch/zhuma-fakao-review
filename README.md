@@ -14,7 +14,7 @@ Turn the **entire wrong-answer book** of the ZhuMa bar-exam prep app (zhumavip.c
 
 > This is not "copying the questions over". It reverse-derives the repeatedly-tested knowledge points behind your wrong answers, fills in **error-prone / easily-confused points**, and adjusts the level of detail to your own weak subjects, review progress and study habits.
 
-This is also a [ZCode / Claude Code](https://code.claude.com) **skill package**: drop it into your skills directory and the AI agent will orchestrate the scripts and subagents through the seven-stage flow in `SKILL.md` — you only scan a QR code and answer a few questions.
+This is also a [ZCode / Claude Code](https://code.claude.com) **skill package**: drop it into your skills directory and the AI agent will orchestrate the scripts and subagents through the seven-stage flow in `SKILL.md` — stage 0 is the pre-alignment prerequisite, and stages 1–7 form the seven-stage pipeline; you only scan a QR code and answer a few questions.
 
 ---
 

@@ -12,7 +12,7 @@
 
 > 不是"把题目抄一遍"。它从错题反推反复考的重点知识点，补上**易错/易混点**，并结合你自己的薄弱科目、复习进度、学习习惯调整详略。
 
-这同时是一个 [ZCode / Claude Code](https://code.claude.com) **技能包（Skill）**：把它放进技能目录后，AI Agent 会按 `SKILL.md` 的七阶段流程自主编排脚本与 subagent，你只需要扫码和回答几个问题。
+这同时是一个 [ZCode / Claude Code](https://code.claude.com) **技能包（Skill）**：把它放进技能目录后，AI Agent 会按 `SKILL.md` 的七阶段流程自主编排脚本与 subagent（阶段 0 为对齐前置，阶段 1–7 为流水线七阶段），你只需要扫码和回答几个问题。
 
 ---
 
